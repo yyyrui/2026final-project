@@ -1,0 +1,43 @@
+{
+  "name": "paper_traffic_transfer",
+  "provenance": {
+    "paper": "https://arxiv.org/pdf/2310.01327",
+    "sections": "Appendix C.2, Table 8 traffic superscript t, Table 10",
+    "scope": "Traffic architecture/optimizer values transferred to daily sales, not sales-tuned or a reproduction of paper metrics.",
+    "implementation_choices": "Zero dropout and simple linear attention projections follow local official train.py; table decoder MLP settings used for both marginal conditioner and copula output MLP. Bagging 20 follows official CLI default, batch size 1 is conservative rather than auto-searched."
+  },
+  "context_length": 7,
+  "horizon": 7,
+  "validation_windows": 7,
+  "training": {
+    "max_epochs_per_stage": 1000,
+    "steps_per_epoch": 512,
+    "batch_size": 1,
+    "bagging_size": 20,
+    "patience": 50,
+    "max_training_hours_per_stage": 36,
+    "stage1": {"learning_rate": 0.0025, "weight_decay": 0.0, "clip_gradient": 1000},
+    "stage2": {"learning_rate": 0.00067, "weight_decay": 0.0, "clip_gradient": 10000}
+  },
+  "sampling": {"num_samples": 100, "samples_per_call": 1},
+  "model": {
+    "flow_series_embedding_dim": 16,
+    "copula_series_embedding_dim": 64,
+    "flow_input_encoder_layers": 7,
+    "copula_input_encoder_layers": 5,
+    "input_encoding_normalization": true,
+    "data_normalization": "standardization",
+    "loss_normalization": "both",
+    "positional_encoding": {"dropout": 0.0},
+    "flow_temporal_encoder": {"attention_layers": 4, "attention_heads": 4, "attention_dim": 8, "attention_feedforward_dim": 8, "dropout": 0.0},
+    "copula_temporal_encoder": {"attention_layers": 4, "attention_heads": 4, "attention_dim": 8, "attention_feedforward_dim": 8, "dropout": 0.0},
+    "copula_decoder": {
+      "min_u": 0.05,
+      "max_u": 0.95,
+      "attentional_copula": {"attention_heads": 4, "attention_layers": 2, "attention_dim": 48, "mlp_layers": 6, "mlp_dim": 16, "resolution": 100, "attention_mlp_class": "_simple_linear_projection", "dropout": 0.0, "activation_function": "relu"},
+      "dsf_marginal": {"mlp_layers": 6, "mlp_dim": 16, "flow_layers": 4, "flow_hid_dim": 16}
+    },
+    "skip_copula": true,
+    "experiment_mode": "forecasting"
+  }
+}
