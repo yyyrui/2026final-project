@@ -7,14 +7,21 @@
 
 這運用Empirical CDF & Copula觀念對高維度時間數列建構聯合機率分配，之後討論時再跟妳解釋Copula。
 
-2.動手跑這個例子
-[https://nixtlaverse.nixtla.io/neuralforecast/docs/tutorials/hierarchical_forecasting.html?utm_source=chatgpt.com](https://nixtlaverse.nixtla.io/neuralforecast/docs/tutorials/hierarchical_forecasting.html?utm_source=chatgpt.com)
-接著它的loss應該不是Poisson Mixture，妳可以用AI協助研究是否能接它的Poisson Mixture Loss, see
-[https://nixtlaverse.nixtla.io/neuralforecast/losses.pytorch.html?utm_source=chatgpt.com#poisson-mixture-mesh-pmm](https://nixtlaverse.nixtla.io/neuralforecast/losses.pytorch.html?utm_source=chatgpt.com#poisson-mixture-mesh-pmm)
+目前 TACTiS2 的做法是：
+第 1～32 條序列    → 訓練 TACTiS2 A → 這 32 條的預測
+第 33～64 條序列   → 訓練 TACTiS2 B → 這 32 條的預測
+……
+最後 16 條序列    → 訓練 TACTiS2 第 1,563 個 → 預測
 
-程式在[https://github.com/Nixtla/neuralforecast?utm_source=chatgpt.com](https://github.com/Nixtla/neuralforecast?utm_source=chatgpt.com)
-|網址|是什麼？|你要拿它做什麼？|
+把所有預測接成一張表 → 計算全部資料的誤差
+這些模型使用相同架構，但各自學出不同的權重。A 不會知道 B 那組的資料，所以無法學習不同組之間的關係。
 
-|第一個：Hierarchical Forecast|完整的階層式預測教學|先照著跑，取得原版結果|
-|第二個：Poisson Mixture Mesh|套件已提供的 loss 說明|研究怎麼放進第一個範例|
-|第三個：GitHub|NeuralForecast 的原始程式碼|遇到不清楚的實作或相容性問題時查閱|
+你原先想要的則是：
+全部 50,000 條序列
+        ↓
+同一個 TACTiS2，共用一套權重並進行聯合預測
+        ↓
+全部序列的預測結果
+Chronos 的情況又不同：目前是同一個預訓練模型分批接收資料，每批都用同一套權重，沒有另外訓練 1,563 個 Chronos；原版 Chronos 在這個入口中也沒有聯合建模不同序列。
+
+所以目前比較的是：「分組獨立訓練的 TACTiS2」與「同一個預訓練 Chronos」在全部資料上的預測誤差。
