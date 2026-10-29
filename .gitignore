@@ -4,4 +4,5 @@ outputs/
 __pycache__/
 *.pyc
 .DS_Store
-dataset/
+.vscode/
+chronos/chronos-forecasting/.git/
