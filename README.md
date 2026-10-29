@@ -1,11 +1,3 @@
-# 11/4 前 找+傳資料集給老師還有跑benchmark
-建議妳先從這篇ICLR 2024讀起
-
-[https://arxiv.org/abs/2310.01327](https://arxiv.org/abs/2310.01327)
-
-程式在[https://github.com/ServiceNow/tactis](https://github.com/ServiceNow/tactis)
-
-這運用Empirical CDF & Copula觀念對高維度時間數列建構聯合機率分配，之後討論時再跟妳解釋Copula。
 
 目前 TACTiS2 的做法是：
 第 1～32 條序列    → 訓練 TACTiS2 A → 這 32 條的預測
