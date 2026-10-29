@@ -57,3 +57,9 @@ python -m unittest discover -s tests -v
 | 原版 Chronos tiny | 0.475959 | 0.715994 | 44.6311% |
 
 權重快取已下載。離線重跑可用 `HF_HUB_OFFLINE=1 python run_comparison.py`，避免網路檢查。試跑所用公開權重 snapshot 為 `29d808298f1a62493e7b9a5e08529d0d930fa189`。`requirements-comparison.lock.txt` 記錄本次虛擬環境的確切套件版本；跨平台安裝優先使用範圍相依檔。
+
+## 全部 50,000 組序列
+
+已新增 `--all-series` 的固定分組、斷點續跑與全量評估模式。
+前述最多 64 條限制僅適用舊的單模型模式；分組模式限制的是每組最多 64 條。
+完整操作和限制見 [FULL_COMPARISON.md](FULL_COMPARISON.md)。

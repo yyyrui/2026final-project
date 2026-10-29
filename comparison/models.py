@@ -84,12 +84,18 @@ def train_tactis(values, args, output):
     return samples[0, :, -horizon:, :].cpu().numpy(), log
 
 
-def predict_chronos(values, args):
+def load_chronos(args):
     sys.path.insert(0, str(ROOT / 'chronos' / 'chronos-forecasting' / 'src'))
     from chronos import ChronosPipeline
 
     pipeline = ChronosPipeline.from_pretrained(args.chronos_model, device_map=args.device,
-                                               torch_dtype=torch.float32, cache_dir=str(ROOT / '.cache' / 'huggingface'))
+                                               torch_dtype=torch.float32, revision=getattr(args, "chronos_revision", None), cache_dir=str(ROOT / '.cache' / 'huggingface'))
+    return pipeline
+
+
+def predict_chronos(values, args, pipeline=None):
+    if pipeline is None:
+        pipeline = load_chronos(args)
     batches = []
     for start in range(0, len(values), args.chronos_batch_size):
         context = torch.from_numpy(values[start:start + args.chronos_batch_size, -args.context_length:].copy())

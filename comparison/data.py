@@ -33,7 +33,7 @@ def read_daily(path: Path) -> pd.DataFrame:
 
 
 def load_sales(train_path: Path, eval_path: Path, num_series=4, seed=42, horizon=7) -> SalesPanel:
-    if num_series < 1 or horizon < 1:
+    if (num_series is not None and num_series < 1) or horizon < 1:
         raise ValueError('num_series and horizon must be positive')
     train, evaluation = read_daily(train_path), read_daily(eval_path)
     keys = train[KEYS].drop_duplicates().sort_values(KEYS).reset_index(drop=True)
@@ -50,6 +50,8 @@ def load_sales(train_path: Path, eval_path: Path, num_series=4, seed=42, horizon
     for name, frame, dates in [('train', train, train_dates), ('eval', evaluation, eval_dates)]:
         if not frame.groupby(KEYS).size().eq(len(dates)).all():
             raise ValueError(f'{name}: missing daily observations; no implicit zero filling')
+    if num_series is None:
+        num_series = len(keys)
     if num_series > len(keys):
         raise ValueError(f'Requested {num_series} series but only {len(keys)} exist')
     indices = np.sort(np.random.default_rng(seed).choice(len(keys), num_series, replace=False))

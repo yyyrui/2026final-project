@@ -43,6 +43,10 @@ def main():
     parser.add_argument('--eval-path', type=Path, default=ROOT / 'dataset/eval.parquet')
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--num-series', type=positive, default=4)
+    parser.add_argument('--all-series', action='store_true', help='Process every series in fixed groups')
+    parser.add_argument('--group-size', type=positive, default=32)
+    parser.add_argument('--resume', action='store_true', help='Resume a grouped run in --output-dir')
+    parser.add_argument('--grouped', action='store_true', help='Use resumable groups for a subset test')
     parser.add_argument('--context-length', type=positive, default=28)
     parser.add_argument('--horizon', type=positive, default=7)
     parser.add_argument('--epochs', type=positive, default=2, help='epochs per TACTiS stage')
@@ -53,19 +57,31 @@ def main():
     parser.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
     parser.add_argument('--threads', type=positive, default=2)
     parser.add_argument('--chronos-model', default='amazon/chronos-t5-tiny', help='Original Chronos checkpoint')
+    parser.add_argument('--chronos-revision', default='29d808298f1a62493e7b9a5e08529d0d930fa189', help='Pinned tiny checkpoint revision; override when changing model')
+    parser.add_argument('--offline', action='store_true', help='Use already downloaded model files only')
     parser.add_argument('--chronos-batch-size', type=positive, default=8)
     parser.add_argument('--data-only', action='store_true')
     args = parser.parse_args()
+    if args.offline:
+        os.environ['HF_HUB_OFFLINE'] = '1'
     if args.context_length < 2 or args.learning_rate <= 0:
         parser.error('context-length must be >= 2 and learning-rate must be positive')
     if args.device == 'cuda' and not torch.cuda.is_available():
         parser.error('CUDA is unavailable; use --device cpu')
-    if args.num_series > 64:
+    if args.group_size > 64:
+        parser.error("group-size must be <= 64")
+    if args.resume and (not args.output_dir or not (args.all_series or args.grouped)):
+        parser.error("--resume needs --output-dir and --all-series or --grouped")
+    if args.num_series > 64 and not (args.all_series or args.grouped):
         parser.error('This small joint-model runner supports at most 64 series; larger runs need grouping and memory planning')
     for field in ('train_path', 'eval_path', 'output_dir'):
         path = getattr(args, field)
         if path is not None and not path.is_absolute():
             setattr(args, field, ROOT / path)
+    if args.all_series or args.grouped:
+        from comparison.full import run_grouped
+        run_grouped(args)
+        return
     output = args.output_dir or ROOT / 'outputs' / datetime.now().strftime('%Y%m%d-%H%M%S-%f')
     output.mkdir(parents=True, exist_ok=False)
     random.seed(args.seed)
