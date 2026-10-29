@@ -10,7 +10,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+import torch
 
+print("Mac GPU 是否可用：", torch.backends.mps.is_available())
 # Ignore warnings to get a clean output
 from tactis.gluon.metrics import compute_validation_metrics, compute_validation_metrics_interpolation
 from tactis.model.utils import check_memory

@@ -1,0 +1,7 @@
+numpy>=1.23.5,<3
+pandas>=2,<4
+pyarrow>=14
+torch>=2.2,<3
+transformers>=4.41,<5
+accelerate>=1.1,<2
+einops>=0.7,<1
