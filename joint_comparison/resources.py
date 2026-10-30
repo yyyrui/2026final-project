@@ -10,13 +10,16 @@ def estimate(series, config):
     predicted, observed = series*horizon, series*history
     # decoder.py::loss explicitly allocates [batch, heads, pred_tokens, all_tokens].
     one = heads*predicted*(predicted+observed)*4  # validation batch = 1
-    bag = min(series, config['training']['bagging_size'])
+    bagging = config['training']['bagging_size']
+    bag = series if bagging is None else min(series, bagging)
     train_one = config['training']['batch_size']*heads*(bag*horizon)*(bag*(history+horizon))*4
     # decoder.py::sample keys_samples AND values_samples, allocated for each layer.
     sample_cache = 2*layers*config['sampling']['samples_per_call']*heads*predicted*dimension*4
     return dict(series=series, history_days=history, horizon_days=horizon,
                 validation_one_dense_tensor_bytes=one,
                 validation_one_dense_tensor_TiB=one/2**40,
+                training_series_per_step=bag,
+                training_one_dense_tensor_bytes=train_one,
                 training_bag_one_dense_tensor_bytes=train_one,
                 sampling_predicted_kv_cache_bytes=sample_cache,
                 joint_autoregressive_steps_per_sample_call=predicted,
@@ -35,6 +38,8 @@ def hardware(device):
 def blockers(estimate, capacity):
     reasons=[]
     # Conservative refusal, not a guarantee that every accepted configuration fits.
+    if estimate['training_one_dense_tensor_bytes']*4 > capacity['free_bytes']*.8:
+        reasons.append('Training dense attention exceeds device memory allowance (4x single tensor guard; gradients excluded).')
     if estimate['validation_one_dense_tensor_bytes']*4 > capacity['free_bytes']*.8:
         reasons.append('Unbagged validation dense attention exceeds device memory allowance (4x single tensor guard).')
     if estimate['sampling_predicted_kv_cache_bytes']*2 > capacity['free_bytes']*.8:

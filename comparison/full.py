@@ -2,7 +2,6 @@
 from argparse import Namespace
 from contextlib import contextmanager
 from datetime import datetime, timezone
-import fcntl
 import hashlib
 import importlib.metadata
 import json
@@ -10,6 +9,11 @@ import os
 from pathlib import Path
 import random
 import time
+
+if os.name == 'nt':
+    import msvcrt
+else:
+    import fcntl
 
 import numpy as np
 import pandas as pd
@@ -35,15 +39,29 @@ def atomic_json(path, value):
 
 @contextmanager
 def run_lock(output):
-    with (output / '.run.lock').open('a') as lock:
+    with (output / '.run.lock').open('a+b') as lock:
+        if os.name == 'nt':
+            # Windows locks a byte range; provide one byte even in a new file.
+            lock.seek(0, os.SEEK_END)
+            if lock.tell() == 0:
+                lock.write(b'\0')
+                lock.flush()
+            lock.seek(0)
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
+            if os.name == 'nt':
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
             raise RuntimeError(f'Another process is using {output}') from exc
         try:
             yield
         finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+            if os.name == 'nt':
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def signature(args):

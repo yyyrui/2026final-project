@@ -23,7 +23,10 @@ def save_checkpoint(path, checkpoint):
 def build_model(series, config, device, stage=1):
     sys.path.insert(0,str(ROOT/'TACTiS2/TACTiS'))
     from tactis.model.tactis import TACTiS
-    model=TACTiS(num_series=series,bagging_size=min(series,config['training']['bagging_size']),
+    bagging=config['training']['bagging_size']
+    # None uses every series in every optimizer step, as well as at inference.
+    bagging=None if bagging is None else min(series,bagging)
+    model=TACTiS(num_series=series,bagging_size=bagging,
                  **deepcopy(config['model']))
     if stage==2: model.initialize_stage2()
     return model.to(device)
