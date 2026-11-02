@@ -1,0 +1,15 @@
+{
+  "raw/M4-info.csv": "26a75cc9b9f65e351b39b0bdbb7e3464ac837df0baf541ab55abdd2ba1a14c88",
+  "raw/Weekly-train.csv": "d478d3f6ed673e6ed3c2cb0fbed5425f72eedd51318ebebeb0b5ecfcefc37714",
+  "raw/Daily-train.csv": "78e94591c60c06309f1e544fd7b2ccba28f3616b01913dd336a1d1d98483a1ec",
+  "raw/Hourly-train.csv": "ea59b7783573c49077a835ab6465c7d66f1474783360f310988a9a737fbca62f",
+  "raw/Monthly-test.csv": "5e3538bf23b4a09f4078180c3e2b34859f0382e1c4f22564affc1797e8f3f48f",
+  "raw/Hourly-test.csv": "71a57fccb15e534d973626ada4fb87febf789e9317715b7cc6dd3b5f90db6f42",
+  "raw/Weekly-test.csv": "3b2bc4be8e636e802260dcd843ca3c5da40536a1fbe1ecb3229a97dae4f44688",
+  "raw/Monthly-train.csv": "63aaa56198b4a22279a2fec541f56921f3bed6d8e0f84e550206df9276f2e9b9",
+  "raw/Quarterly-test.csv": "bf1cab3b969a744c220cdc148e3829803eaa5da2754270fc4f376e775cd7d0ae",
+  "raw/Daily-test.csv": "633b0815626ae266d36872c4d53e95eb93ee8d43e79587fceec519eba3e6b05e",
+  "raw/Yearly-test.csv": "6dc2dd45b3af320389e2d3735cb4b3cdf320b63cbcda15d1a17193ab99702306",
+  "raw/Yearly-train.csv": "6aa668d4f04654c0bf5f07b266a51c556f0df2faf4709f852653755396a249e4",
+  "raw/Quarterly-train.csv": "4450678cd493aa965c14bde984a5b62a66d8c3b2f7af1e53779bc91ff008ccdc"
+}

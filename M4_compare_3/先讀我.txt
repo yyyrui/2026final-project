@@ -1,0 +1,4 @@
+交付內容：Windows Python 程式、完整 M4 已轉換資料、使用說明、驗證報告。
+請先閱讀 README_m4_windows.md。資料位於 data/prepared/。
+Python 第一個 chunk 安裝套件並下載執行需要的原始資料與模型權重。資料包不是完整離線執行環境。
+重要：沒有全量模型訓練結果或準確度分數。100,000 條同時聯合建模的單一 attention 張量約需 11.52 TB；一般桌機會被資源檢查擋下。Windows/CUDA 尚未實測。
