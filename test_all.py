@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare three models on every sales series; one joint TACTiS-2, no grouping or bagging."""
+"""Compare TACTiS2, Chronos-2 Small and M4 Naive on every sales series; joint TACTiS2 without grouping or bagging."""
 from comparison.runner import main
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare three models on a fixed sample of 5,000 complete sales series."""
+"""Compare TACTiS2, Chronos-2 Small and M4 Naive on a fixed sample of 5,000 complete sales series."""
 from comparison.runner import main
 
 

@@ -5,6 +5,6 @@ pyarrow>=18
 torch>=2.5,<3
 einops>=0.8,<1
 sktime==0.35.0
-chronos-forecasting==1.5.2
-transformers==4.48.3
+-e ./chronos/chronos-forecasting  # Vendored official chronos-forecasting 2.3.2
+transformers==4.55.4
 accelerate>=1.1,<2

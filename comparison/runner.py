@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Compare joint TACTiS-2, pretrained Chronos and the sktime M4 Naive baseline.
+"""Compare joint TACTiS-2, pretrained Chronos-2 Small and the sktime M4 Naive baseline.
 
 Both entry points use the same model configuration and evaluation protocol.
 Only series selection differs: a fixed 5,000-series sample or every series.
@@ -38,8 +38,7 @@ from torch.utils.checkpoint import checkpoint
 
 from comparison.data import KEYS, load_sales
 
-CHRONOS_ID = "amazon/chronos-t5-tiny"
-CHRONOS_REVISION = "29d808298f1a62493e7b9a5e08529d0d930fa189"
+from comparison.chronos2 import DEFAULT_MODEL, DEFAULT_REVISION, predict_chronos2, validate_model
 
 
 def positive(value):
@@ -52,7 +51,7 @@ def positive(value):
 def arguments(argv=None, mode="sample"):
     if mode not in ("sample", "all"):
         raise ValueError("mode must be sample or all")
-    run_name = "sample5000" if mode == "sample" else "all"
+    run_name = "sample5000_chronos2" if mode == "sample" else "all_chronos2"
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train-path", type=Path, default=PROJECT / "dataset/train.parquet")
     parser.add_argument("--eval-path", type=Path, default=PROJECT / "dataset/eval.parquet")
@@ -65,18 +64,23 @@ def arguments(argv=None, mode="sample"):
     parser.add_argument("--epochs", type=positive, default=30, help="maximum epochs PER stage")
     parser.add_argument("--patience", type=positive, default=8)
     parser.add_argument("--learning-rate", type=float, default=0.001)
-    parser.add_argument("--samples", type=positive, default=20)
+    parser.add_argument("--samples", type=positive, default=20, help="TACTiS2 samples only; Chronos-2 predicts quantiles directly")
     parser.add_argument("--samples-per-call", type=positive, default=1,
                         help="independent draws per call; every draw includes ALL selected series")
     parser.add_argument("--attention-block", type=positive, default=128,
                         help="query rows per attention calculation; does NOT group series")
-    parser.add_argument("--chronos-batch-size", type=positive, default=32,
-                        help="inference batches for independent pretrained Chronos series")
-    parser.add_argument("--chronos-model", default=CHRONOS_ID)
-    parser.add_argument("--chronos-revision", default=CHRONOS_REVISION)
+    parser.add_argument("--chronos2-batch-size", type=positive, default=32,
+                        help="inference batches for independent pretrained Chronos-2 series")
+    parser.add_argument("--chronos2-model", default=DEFAULT_MODEL, help="Chronos-2 Hub model ID or local checkpoint directory")
+    parser.add_argument("--chronos2-revision", help="Hub revision; defaults to the pinned revision for Chronos-2 Small")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--offline", action="store_true")
     args = parser.parse_args(argv)
+    local_chronos2 = ROOT / args.chronos2_model
+    if local_chronos2.is_dir():
+        args.chronos2_model = str(local_chronos2.resolve())
+    if args.chronos2_revision is None and args.chronos2_model == DEFAULT_MODEL:
+        args.chronos2_revision = DEFAULT_REVISION
     args.mode = mode
     args.num_series = SAMPLE_SERIES if mode == "sample" else None
     if args.output is None:
@@ -324,29 +328,6 @@ def validate_samples(samples, n, args):
         raise ValueError(f"Invalid forecast samples: {samples.shape}")
 
 
-def predict_chronos(panel, args):
-    # Use the stable original Chronos distribution instead of importing the
-    # local newer package, which also eagerly imports unrelated Chronos-2 code.
-    from chronos import ChronosPipeline
-
-    seed_all(args.seed + 20000)
-    pipeline = ChronosPipeline.from_pretrained(
-        args.chronos_model, revision=args.chronos_revision, device_map=args.device,
-        torch_dtype=torch.float32, cache_dir=str(ROOT / ".cache" / "huggingface"),
-        local_files_only=args.offline)
-    draws = []
-    for start in range(0, len(panel.keys), args.chronos_batch_size):
-        history = torch.from_numpy(panel.train[start:start + args.chronos_batch_size, -args.context:].copy())
-        with torch.no_grad():
-            samples = pipeline.predict(history, prediction_length=args.horizon, num_samples=args.samples)
-        draws.append(samples.cpu().numpy().transpose(0, 2, 1))
-        print(f"Chronos: {min(start+args.chronos_batch_size, len(panel.keys))}/{len(panel.keys)}", flush=True)
-    samples = np.concatenate(draws, axis=0)
-    validate_samples(samples, len(panel.keys), args)
-    np.savez_compressed(args.work_dir / "chronos_samples.npz", samples=samples)
-    return np.median(samples, axis=-1)
-
-
 def score(actual, prediction):
     error = np.asarray(prediction, dtype=np.float64) - np.asarray(actual, dtype=np.float64)
     denominator = np.abs(actual.astype(np.float64)).sum()
@@ -381,8 +362,9 @@ def main(argv=None, mode="sample"):
         raise FileExistsError("Existing results are protected. Choose a new --work-dir and --output.")
     # Check dependency availability before an expensive run.
     if not args.prepare_only:
-        print("[Startup] Checking Chronos dependencies (including SciPy)...", flush=True)
-        from chronos import ChronosPipeline  # noqa: F401
+        print("[Startup] Checking Chronos-2 dependencies and checkpoint family...", flush=True)
+        from chronos import Chronos2Pipeline  # noqa: F401
+        validate_model(args)
         print("[Startup] Checking sktime dependencies...", flush=True)
         from sktime.forecasting.naive import NaiveForecaster  # noqa: F401
         print("[Startup] Model dependencies loaded successfully.", flush=True)
@@ -414,17 +396,21 @@ def main(argv=None, mode="sample"):
                                    (Path(__file__).resolve(), PROJECT / "comparison/data.py",
                                     ROOT / ("test_5000.py" if mode == "sample" else "test_all.py"),
                                     ROOT / "requirements.txt", ROOT / "sktime-m4/scripts/sales_naive.py",
+                                    ROOT / "comparison/chronos2.py", ROOT / "chronos/model.json",
+                                    ROOT / "chronos/chronos-forecasting/src/chronos/chronos2/pipeline.py",
                                     PROJECT / "TACTiS2/TACTiS/tactis/model/tactis.py",
                                     PROJECT / "TACTiS2/TACTiS/tactis/model/decoder.py",
                                     PROJECT / "TACTiS2/TACTiS/tactis/model/encoder.py")},
                     versions=versions, tactis_config=model_config(len(panel.keys)),
+                    chronos2=dict(model_id=args.chronos2_model, revision=args.chronos2_revision,
+                                  family="Chronos-2", point_quantile=0.5, cross_learning=False),
                     sktime_m4_baseline=source_spec(),
                     protocol=dict(training="one joint model, no series groups, no bagging; all eligible windows each epoch",
                         memory="exact attention query blocks with checkpoint recomputation; every query sees all allowed keys",
                         validation="last horizon days of train only; best checkpoint per stage; no eval tuning or refit",
                         forecast_history=f"same final {args.context} training days for all three models",
-                        chronos="pretrained original Chronos; no fine-tuning; independent inference batches",
-                        point_forecast="median of samples; Naive deterministic; no clipping",
+                        chronos2="pretrained Chronos-2; no fine-tuning; univariate inputs; cross_learning=False",
+                        point_forecast="TACTiS2 sample median; Chronos-2 q=0.5; Naive deterministic; no clipping",
                         ranking="MAE ascending (primary); RMSE and WAPE also reported; lower is better"))
     write_json(args.work_dir / "manifest.json", manifest)
     write_json(args.work_dir / "status.json", {"status": "prepared"})
@@ -437,7 +423,7 @@ def main(argv=None, mode="sample"):
     try:
         from sales_naive import forecast_sales
         jobs = (("tactis2", lambda: train_tactis(panel, args)),
-                ("chronos", lambda: predict_chronos(panel, args)),
+                ("chronos2", lambda: predict_chronos2(panel, args)),
                 ("sktime_m4_naive", lambda: forecast_sales(panel.train, context_length=args.context,
                     horizon=args.horizon, progress=lambda done, total: print(f"sktime Naive: {done}/{total}", flush=True))))
         for name, run in jobs:

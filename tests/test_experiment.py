@@ -144,7 +144,7 @@ class ExperimentTests(unittest.TestCase):
                 load_sales(pointer, pointer, num_series=None)
 
     def test_full_entrypoint_three_models_from_another_directory(self):
-        model = experiment.ROOT / "chronos/chronos-forecasting/test/dummy-chronos-model"
+        model = experiment.ROOT / "chronos/chronos-forecasting/test/dummy-chronos2-model"
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
             self.fixture(folder)
@@ -152,7 +152,7 @@ class ExperimentTests(unittest.TestCase):
             command = [sys.executable, str(experiment.ROOT / "test_all.py"),
                 "--train-path", str(folder / "train.parquet"),
                 "--eval-path", str(folder / "eval.parquet"), "--work-dir", str(artifacts),
-                "--chronos-model", str(model), "--offline", "--context", "4", "--horizon", "2",
+                "--chronos2-model", str(model), "--offline", "--context", "4", "--horizon", "2",
                 "--epochs", "1", "--samples", "2", "--attention-block", "3", "--device", "cpu"]
             result = subprocess.run(command, cwd=folder, capture_output=True, text=True, timeout=120)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -165,7 +165,7 @@ class ExperimentTests(unittest.TestCase):
             self.assertEqual(len(frame), 10)
             self.assertFalse(frame.isna().any().any())
             table = pd.read_csv(artifacts / "metrics.csv")
-            self.assertEqual(set(table.model), {"tactis2", "chronos", "sktime_m4_naive"})
+            self.assertEqual(set(table.model), {"tactis2", "chronos2", "sktime_m4_naive"})
             self.assertTrue(table.observations.eq(10).all())
             # Existing experiments must not be overwritten.
             repeat = subprocess.run(command, cwd=folder, capture_output=True, text=True, timeout=30)
@@ -173,28 +173,28 @@ class ExperimentTests(unittest.TestCase):
             self.assertIn("Existing results are protected", repeat.stderr)
 
     @patch.object(experiment, "SAMPLE_SERIES", 3)
-    def test_three_model_cli_with_local_chronos_fixture(self):
+    def test_three_model_cli_with_local_chronos2_fixture(self):
         import json
-        # Upstream's bundled dummy Chronos weights exercise real loading and
+        # Upstream's bundled dummy Chronos-2 weights exercise real loading and
         # inference offline. They are NOT the pretrained benchmark model.
-        model = experiment.PROJECT / "chronos/chronos-forecasting/test/dummy-chronos-model"
+        model = experiment.PROJECT / "chronos/chronos-forecasting/test/dummy-chronos2-model"
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
             self.fixture(folder)
             output, artifacts = folder / "forecast.csv", folder / "artifacts"
             experiment.main(["--train-path", str(folder / "train.parquet"),
                 "--eval-path", str(folder / "eval.parquet"), "--output", str(output),
-                "--work-dir", str(artifacts), "--chronos-model", str(model), "--offline",
+                "--work-dir", str(artifacts), "--chronos2-model", str(model), "--offline",
                 "--context", "4", "--horizon", "2", "--epochs", "1",
-                "--samples", "2", "--chronos-batch-size", "2", "--attention-block", "3",
+                "--samples", "2", "--chronos2-batch-size", "2", "--attention-block", "3",
                 "--device", "cpu"])
             frame = pd.read_csv(output)
             self.assertEqual(frame.columns.tolist(), experiment.KEYS +
-                ["dt", "actual", "tactis2", "chronos", "sktime_m4_naive"])
+                ["dt", "actual", "tactis2", "chronos2", "sktime_m4_naive"])
             self.assertEqual(len(frame), 6)
             self.assertFalse(frame.isna().any().any())
             table = pd.read_csv(artifacts / "metrics.csv")
-            self.assertEqual(set(table.model), {"tactis2", "chronos", "sktime_m4_naive"})
+            self.assertEqual(set(table.model), {"tactis2", "chronos2", "sktime_m4_naive"})
             self.assertTrue(table.MAE.is_monotonic_increasing)
             self.assertTrue(table.observations.eq(6).all())
             self.assertEqual(json.loads((artifacts / "status.json").read_text())["status"], "complete")
