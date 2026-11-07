@@ -10,8 +10,9 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-from comparison import chronos2
-from comparison.runner import arguments
+import test_5000 as chronos2
+import test_all
+from test_5000 import arguments
 
 
 class Chronos2Tests(unittest.TestCase):
@@ -20,11 +21,11 @@ class Chronos2Tests(unittest.TestCase):
         self.model = chronos2.ROOT / "chronos/chronos-forecasting/test/dummy-chronos2-model"
 
     def test_both_entrypoints_select_pinned_small_model(self):
-        for mode in ("sample", "all"):
-            args = arguments([], mode=mode)
+        for script in (chronos2, test_all):
+            args = script.arguments([])
             self.assertEqual(args.chronos2_model, "autogluon/chronos-2-small")
             self.assertEqual(args.chronos2_revision, chronos2.MODEL_SPEC["model_revision"])
-            self.assertIn("chronos2", str(args.work_dir))
+            self.assertEqual(args.output.name, script.SCRIPT_PATH.with_suffix(".csv").name)
         custom = arguments(["--chronos2-model", "amazon/chronos-2"])
         self.assertIsNone(custom.chronos2_revision)
 

@@ -4,8 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from comparison.data import load_sales
-from comparison.runner import score
+from test_5000 import load_sales, score
 
 
 class ComparisonTests(unittest.TestCase):

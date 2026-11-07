@@ -2,6 +2,10 @@
 .venv-*/
 .cache/
 outputs/
+/test_5000.csv
+/test_all.csv
+/test_5000.csv.tmp
+/test_all.csv.tmp
 __pycache__/
 *.pyc
 .pytest_cache/

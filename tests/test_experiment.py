@@ -6,13 +6,15 @@ import unittest
 import json
 import subprocess
 import sys
+import shutil
 
 import numpy as np
 import pandas as pd
 import torch
 
-from comparison import runner as experiment
-from comparison.data import load_sales
+import test_5000 as experiment
+import test_all
+from test_5000 import load_sales
 from unittest.mock import patch
 
 
@@ -127,14 +129,15 @@ class ExperimentTests(unittest.TestCase):
 
     def test_entrypoint_selection_and_output_paths(self):
         sample = experiment.arguments([])
-        full = experiment.arguments([], mode="all")
+        full = test_all.arguments([])
         self.assertEqual(sample.num_series, 5000)
         self.assertIsNone(full.num_series)
         self.assertNotEqual(sample.work_dir, full.work_dir)
         self.assertEqual(sample.train_path, experiment.ROOT / "dataset/train.parquet")
-        self.assertEqual(full.output, full.work_dir / "predictions.csv")
-        custom = experiment.arguments(["--work-dir", "outputs/custom"], mode="all")
-        self.assertEqual(custom.output, experiment.ROOT / "outputs/custom/predictions.csv")
+        self.assertEqual(sample.output, experiment.ROOT / "test_5000.csv")
+        self.assertEqual(full.output, experiment.ROOT / "test_all.csv")
+        custom = test_all.arguments(["--work-dir", "outputs/custom"])
+        self.assertEqual(custom.output, experiment.ROOT / "test_all.csv")
 
     def test_lfs_pointer_has_actionable_error(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -149,7 +152,14 @@ class ExperimentTests(unittest.TestCase):
             folder = Path(temporary)
             self.fixture(folder)
             artifacts = folder / "artifacts"
-            command = [sys.executable, str(experiment.ROOT / "test_all.py"),
+            script = folder / "test_all.py"
+            shutil.copyfile(experiment.ROOT / "test_all.py", script)
+            shutil.copyfile(experiment.ROOT / "requirements.txt", folder / "requirements.txt")
+            for name in ("TACTiS2", "chronos", "sktime-m4"):
+                shutil.copytree(experiment.ROOT / name, folder / name,
+                                ignore=shutil.ignore_patterns("__pycache__", ".git"))
+            self.assertFalse((folder / "comparison").exists())
+            command = [sys.executable, str(script),
                 "--train-path", str(folder / "train.parquet"),
                 "--eval-path", str(folder / "eval.parquet"), "--work-dir", str(artifacts),
                 "--chronos2-model", str(model), "--offline", "--context", "4", "--horizon", "2",
@@ -164,15 +174,24 @@ class ExperimentTests(unittest.TestCase):
             frame = pd.read_csv(artifacts / "predictions.csv")
             self.assertEqual(len(frame), 10)
             self.assertFalse(frame.isna().any().any())
-            table = pd.read_csv(artifacts / "metrics.csv")
+            table = pd.read_csv(folder / "test_all.csv")
+            pd.testing.assert_frame_equal(table, pd.read_csv(artifacts / "metrics.csv"))
             self.assertEqual(set(table.model), {"tactis2", "chronos2", "sktime_m4_naive"})
             self.assertTrue(table.observations.eq(10).all())
+            self.assertTrue(table.num_series.eq(5).all())
+            self.assertTrue(table.MAE.is_monotonic_increasing)
+            for name in table.model:
+                expected = experiment.score(frame.actual.to_numpy(), frame[name].to_numpy())
+                row = table.set_index("model").loc[name]
+                for metric in ("MAE", "RMSE", "WAPE"):
+                    # Float32 predictions are serialized as decimal CSV values.
+                    np.testing.assert_allclose(row[metric], expected[metric], rtol=1e-6, atol=1e-7)
             # Existing experiments must not be overwritten.
             repeat = subprocess.run(command, cwd=folder, capture_output=True, text=True, timeout=30)
             self.assertNotEqual(repeat.returncode, 0)
             self.assertIn("Existing results are protected", repeat.stderr)
 
-    @patch.object(experiment, "SAMPLE_SERIES", 3)
+    @patch.object(experiment, "NUM_SERIES", 3)
     def test_three_model_cli_with_local_chronos2_fixture(self):
         import json
         # Upstream's bundled dummy Chronos-2 weights exercise real loading and
@@ -181,14 +200,17 @@ class ExperimentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
             self.fixture(folder)
-            output, artifacts = folder / "forecast.csv", folder / "artifacts"
+            output, artifacts = folder / "test_5000.csv", folder / "artifacts"
             experiment.main(["--train-path", str(folder / "train.parquet"),
                 "--eval-path", str(folder / "eval.parquet"), "--output", str(output),
                 "--work-dir", str(artifacts), "--chronos2-model", str(model), "--offline",
                 "--context", "4", "--horizon", "2", "--epochs", "1",
                 "--samples", "2", "--chronos2-batch-size", "2", "--attention-block", "3",
                 "--device", "cpu"])
-            frame = pd.read_csv(output)
+            comparison = pd.read_csv(output)
+            pd.testing.assert_frame_equal(comparison, pd.read_csv(artifacts / "metrics.csv"))
+            self.assertEqual(len(comparison), 3)
+            frame = pd.read_csv(artifacts / "predictions.csv")
             self.assertEqual(frame.columns.tolist(), experiment.KEYS +
                 ["dt", "actual", "tactis2", "chronos2", "sktime_m4_naive"])
             self.assertEqual(len(frame), 6)
@@ -198,6 +220,23 @@ class ExperimentTests(unittest.TestCase):
             self.assertTrue(table.MAE.is_monotonic_increasing)
             self.assertTrue(table.observations.eq(6).all())
             self.assertEqual(json.loads((artifacts / "status.json").read_text())["status"], "complete")
+
+    @patch.object(experiment, "NUM_SERIES", 3)
+    def test_failed_model_does_not_publish_comparison_csv(self):
+        model = experiment.ROOT / "chronos/chronos-forecasting/test/dummy-chronos2-model"
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            self.fixture(folder)
+            output, artifacts = folder / "test_5000.csv", folder / "artifacts"
+            with patch.object(experiment, "train_tactis", side_effect=RuntimeError("test training failure")):
+                with self.assertRaisesRegex(RuntimeError, "test training failure"):
+                    experiment.main(["--train-path", str(folder / "train.parquet"),
+                        "--eval-path", str(folder / "eval.parquet"), "--work-dir", str(artifacts),
+                        "--output", str(output), "--chronos2-model", str(model), "--offline",
+                        "--context", "4", "--horizon", "2", "--device", "cpu"])
+            self.assertFalse(output.exists())
+            self.assertFalse((artifacts / "metrics.csv").exists())
+            self.assertEqual(json.loads((artifacts / "status.json").read_text())["status"], "failed")
 
 
 if __name__ == "__main__":
