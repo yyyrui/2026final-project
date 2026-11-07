@@ -1,8 +1,10 @@
 .venv/
+.venv-*/
 .cache/
 outputs/
 __pycache__/
 *.pyc
+.pytest_cache/
 .DS_Store
 .vscode/
 chronos/chronos-forecasting/.git/
