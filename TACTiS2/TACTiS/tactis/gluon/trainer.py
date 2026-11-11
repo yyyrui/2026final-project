@@ -145,6 +145,7 @@ class TACTISTrainer(Trainer):
         for name, param in net.named_parameters():
             if any(pname in name for pname in parameter_names_to_optimize):
                 params_to_optimize_in_stage2.append(param)
+                # stage 2 的優化器只能拿到copula相關的參數 marginal的參數拿不到
 
         if optimizer_name == "rmsprop":
             optim = RMSprop(
@@ -171,6 +172,7 @@ class TACTISTrainer(Trainer):
         disable_grads.extend(params_input_encoder_flow)
         disable_grads.extend(params_encoder_flow)
         TACTISTrainer.disable_grads(net, disable_grads)
+        # 把 marginal 相關的參數「上鎖」，訓練時梯度不會更新
 
         return net, optim
 

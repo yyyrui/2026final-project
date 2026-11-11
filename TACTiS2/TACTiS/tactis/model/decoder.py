@@ -169,28 +169,42 @@ class CopulaDecoder(nn.Module):
         hist_true_x = true_value[:, mask]  # [batch, series*(num_hist_timesteps)]
         pred_true_x = true_value[:, ~mask]
 
+        # 已觀測的叫做hist 因為是歷史資料
         num_pred_variables = round(T / (history_factor + 1))
 
         # Transform to [0,1] using the marginals
         hist_true_u = self.marginal.forward_no_logdet(hist_encoded_flow, hist_true_x)
+        # 觀測到的x轉成CDF u
         pred_true_u, marginal_logdet = self.marginal.forward_logdet(pred_encoded_flow, pred_true_x)
+        # 遮罩起來的x轉CDF u
 
+        # equation 1 
+        # stage 2才會跑
+        # equation 7 (搭配tactis.py的 initialize_stage2)
+        # 凍結marginal(搭配trainer.py的 TACTISTrainer.disable_grads) 
         if not self.skip_copula:
             copula_loss = self.copula.loss(
-                hist_encoded=hist_encoded_copula,
-                hist_true_u=hist_true_u,
-                pred_encoded=pred_encoded_copula,
-                pred_true_u=pred_true_u,
-                num_series=S,
-                num_timesteps=num_pred_variables,
+                hist_encoded=hist_encoded_copula,# 已知的 C T
+                hist_true_u=hist_true_u, # 已知的X
+                pred_encoded=pred_encoded_copula,# 遮罩的C T
+                pred_true_u=pred_true_u, # 未知的X(訓練時丟進去算liklihood)
+                num_series=S, # 有S條序列
+                num_timesteps=num_pred_variables, # 要預測多少步
             )
+
+        # stage 1跑這裡
+        # equation 8 copula設定成0->只算marginal
         else:
             copula_loss = torch.tensor(0.0).to(mask.device)
 
-        self.copula_loss = copula_loss
+        self.copula_loss = copula_loss # equation 1的NLL
         self.marginal_logdet = marginal_logdet
 
         # Loss = negative log likelihood
+        # g = c*f (sklar)
+        # -logg= -logcopula -logf
+        # copula_loss = −log c_φ^π(u)
+
         return copula_loss - marginal_logdet
 
     def sample(
@@ -472,10 +486,14 @@ class AttentionalCopula(nn.Module):
         )
 
         permutation = torch.arange(0, num_variables).long()
+        # 原本的順序表
 
         # Permute the variables according the random permutation
         pred_encoded = pred_encoded[:, permutation, :]
+        # 用順序表去重排第一維
+
         pred_true_u = pred_true_u[:, permutation]
+        # 
 
         # At the beginning of the attention, we start with the input embedding.
         # Since it does not necessarily have the same dimensions as the hidden layers, apply a linear layer to scale it up.

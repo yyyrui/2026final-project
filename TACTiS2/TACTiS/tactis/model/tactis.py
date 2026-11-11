@@ -218,6 +218,8 @@ class TACTiS(nn.Module):
         copula_temporal_encoder: Optional[Dict[str, Any]] = None,
         copula_decoder: Optional[Dict[str, Any]] = None,
         skip_copula: bool = True,
+        # 默認是從stage 1 開始(跳過copula)
+
         experiment_mode: str = "forecasting",
     ):
         """
@@ -359,9 +361,10 @@ class TACTiS(nn.Module):
     def set_stage(self, stage: int):
         self.stage = stage
 
+    # 切換stage 1 stage 2的函式
     def initialize_stage2(self):
-        self.set_stage(2)
-        self.skip_copula = False
+        self.set_stage(2) # 從stage1轉stage2
+        self.skip_copula = False # 把copula加進去訓練
         if self.copula_encoder_args:
             self.copula_encoder = Encoder(**self.copula_encoder_args)
             self.decoder.attentional_copula_args["input_dim"] = self.copula_encoder.embedding_dim
