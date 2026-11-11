@@ -1,0 +1,24 @@
+{
+  "package_version": "2.3.2",
+  "source_url": "https://files.pythonhosted.org/packages/79/0e/f205d4a1841e3740045c40e9e8caeff584937eb561831144ca7b93a29d49/chronos_forecasting-2.3.2.tar.gz",
+  "source_sha256": "910b0891310b74598a937bb9fe8447ea16393bcc2e1ad8d328c1f8099f909201",
+  "model_id": "autogluon/chronos-2-small",
+  "model_revision": "ddec01313e50b6bc58ebaa92ede81bc24a3d9f9a",
+  "safetensors": {
+    "parameters": {
+      "F32": 27934624
+    },
+    "total": 27934624
+  },
+  "model_files": [
+    ".gitattributes",
+    "README.md",
+    "config.json",
+    "model.safetensors"
+  ],
+  "family": "Chronos-2",
+  "selection": "Smallest parameter count among the officially listed Chronos-2 checkpoints; not a hardware latency guarantee.",
+  "official_model_list": "https://github.com/amazon-science/chronos-forecasting#available-models",
+  "model_card": "https://huggingface.co/autogluon/chronos-2-small",
+  "verified_date": "2026-11-07"
+}

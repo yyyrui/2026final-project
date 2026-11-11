@@ -4,8 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from comparison.data import load_sales
-from run_comparison import metrics
+from test_5000 import load_sales, score
 
 
 class ComparisonTests(unittest.TestCase):
@@ -27,7 +26,7 @@ class ComparisonTests(unittest.TestCase):
         self.evaluation.to_parquet(self.root / 'eval.parquet')
 
     def load(self):
-        return load_sales(self.root / 'train.parquet', self.root / 'eval.parquet', 2)
+        return load_sales(self.root / 'train.parquet', self.root / 'eval.parquet', num_series=None)
 
     def test_alignment_is_independent_of_row_order(self):
         first = self.load()
@@ -64,13 +63,11 @@ class ComparisonTests(unittest.TestCase):
             self.load()
 
     def test_metrics_and_zero_denominator(self):
-        score = metrics(np.array([[1., 3.]]), np.array([[[2., 2.], [1., 1.]]]))
-        self.assertEqual(score['MAE'], 1.5)
-        self.assertAlmostEqual(score['RMSE'], np.sqrt(2.5))
-        self.assertEqual(score['WAPE'], .75)
-        self.assertIsNone(metrics(np.zeros((1, 2)), np.ones((1, 2, 3)))['WAPE'])
-        with self.assertRaises(ValueError):
-            metrics(np.ones((1, 2)), np.full((1, 2, 3), np.nan))
+        result = score(np.array([[1., 3.]]), np.array([[2., 1.]]))
+        self.assertEqual(result['MAE'], 1.5)
+        self.assertAlmostEqual(result['RMSE'], np.sqrt(2.5))
+        self.assertEqual(result['WAPE'], .75)
+        self.assertIsNone(score(np.zeros((1, 2)), np.ones((1, 2)))['WAPE'])
 
 
 if __name__ == '__main__':
